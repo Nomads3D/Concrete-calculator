@@ -332,6 +332,57 @@
       top: 18px;
     }
 
+
+    .saved-estimates {
+      margin-top: 16px;
+      display: grid;
+      gap: 10px;
+    }
+
+    .saved-estimate {
+      border: 1px solid var(--border);
+      background: #fff;
+      border-radius: 14px;
+      padding: 12px;
+      display: grid;
+      gap: 8px;
+    }
+
+    .saved-estimate strong {
+      display: block;
+      color: var(--text);
+      font-size: 0.95rem;
+    }
+
+    .saved-estimate small {
+      color: var(--muted);
+      font-size: 0.78rem;
+    }
+
+    .saved-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+    }
+
+    .saved-actions button {
+      padding: 8px 10px;
+      border-radius: 10px;
+      font-size: 0.78rem;
+      box-shadow: none;
+    }
+
+    .empty-state {
+      margin-top: 12px;
+      color: var(--muted);
+      font-size: 0.86rem;
+      line-height: 1.35;
+    }
+
+    .screen-only {
+      display: block;
+    }
+
     @media (max-width: 860px) {
       .hero,
       .grid,
@@ -397,6 +448,7 @@
       .hint,
       .formula,
       .button-row,
+      .screen-only,
       button {
         display: none !important;
       }
@@ -554,6 +606,34 @@
 
     <section class="grid">
       <div class="stack">
+
+        <div class="card">
+          <div class="section-title">
+            <h2>Estimate Details</h2>
+            <span class="note">Save, print, and export</span>
+          </div>
+
+          <div class="input-grid">
+            <div class="field">
+              <label for="projectName">Project Name</label>
+              <input id="projectName" type="text" value="Nomads Estimate" />
+              <span class="hint">Used for saved files and PDFs</span>
+            </div>
+
+            <div class="field">
+              <label for="customerName">Customer / Location</label>
+              <input id="customerName" type="text" value="" placeholder="Optional" />
+              <span class="hint">Optional</span>
+            </div>
+
+            <div class="field">
+              <label for="estimateDate">Estimate Date</label>
+              <input id="estimateDate" type="date" />
+              <span class="hint">Defaults to today</span>
+            </div>
+          </div>
+        </div>
+
         <div class="card">
           <div class="section-title">
             <h2>Printed Wall</h2>
@@ -708,12 +788,24 @@
         </div>
 
         <div class="button-row">
-          <button type="button" onclick="window.print()">Print / Save PDF</button>
+          <button type="button" id="saveEstimateButton">Save Estimate</button>
+          <button type="button" id="printButton">Print / Save PDF</button>
+          <button type="button" class="secondary" id="exportCsvButton">Export CSV</button>
+          <button type="button" class="secondary" id="exportJsonButton">Export Data</button>
           <button type="button" class="secondary" id="resetButton">Reset Defaults</button>
         </div>
 
         <div class="formula">
           Raw material estimate only. Labor, printer/pump equipment, admixtures, water, freight, taxes, reinforcement, and finishing are not included.
+        </div>
+
+        <div class="screen-only saved-estimates-section">
+          <div class="section-title" style="margin-top: 18px;">
+            <h2>Saved Estimates</h2>
+            <span class="note">Stored on this device</span>
+          </div>
+          <div id="savedEstimates" class="saved-estimates"></div>
+          <p id="savedEmptyState" class="empty-state">No saved estimates yet.</p>
         </div>
       </aside>
     </section>
@@ -733,7 +825,11 @@
       wastePercent: 10
     };
 
-    const ids = Object.keys(defaults);
+    const numericIds = Object.keys(defaults);
+    const detailIds = ["projectName", "customerName", "estimateDate"];
+    const allInputIds = [...detailIds, ...numericIds];
+    const STORAGE_KEY = "nomadsConcreteEstimatorSaved";
+    const DRAFT_KEY = "nomadsConcreteEstimatorDraft";
 
     const money = new Intl.NumberFormat("en-US", {
       style: "currency",
@@ -753,6 +849,10 @@
 
     function getValue(id) {
       return parseNumber(document.getElementById(id).value);
+    }
+
+    function getTextValue(id) {
+      return document.getElementById(id).value.trim();
     }
 
     function formatInputValue(id) {
@@ -775,7 +875,19 @@
       return `${numberFormatter.format(value)} Cubic Yards`;
     }
 
-    function calculate() {
+    function todayIso() {
+      return new Date().toISOString().slice(0, 10);
+    }
+
+    function safeFilename(value) {
+      return String(value || "nomads-estimate")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .slice(0, 60) || "nomads-estimate";
+    }
+
+    function calculateRaw() {
       const wallLength = getValue("wallLength");
       const wallHeight = getValue("wallHeight");
       const wallThickness = getValue("wallThickness");
@@ -787,58 +899,284 @@
       const sandPrice = getValue("sandPrice");
       const wastePercent = getValue("wastePercent");
 
-      const baseCostPerCy =
+      const baseCostPerCubicYard =
         portlandTons * portlandPrice +
         sandTons * sandPrice;
 
-      const costPerCyWithWaste =
-        baseCostPerCy * (1 + wastePercent / 100);
+      const costPerCubicYardWithWaste =
+        baseCostPerCubicYard * (1 + wastePercent / 100);
 
-      const wallCy =
+      const wallCubicYards =
         (wallLength * 12 * wallThickness * wallHeight) / 46656;
 
-      const slabCy =
+      const slabCubicYards =
         (slabSqft * slabDepth) / 324;
 
-      const wallCost = wallCy * costPerCyWithWaste;
-      const slabCost = slabCy * costPerCyWithWaste;
-      const totalCy = wallCy + slabCy;
+      const wallCost = wallCubicYards * costPerCubicYardWithWaste;
+      const slabCost = slabCubicYards * costPerCubicYardWithWaste;
+      const totalCubicYards = wallCubicYards + slabCubicYards;
       const totalCost = wallCost + slabCost;
 
-      setText("baseCost", money.format(baseCostPerCy));
-      setText("wasteCost", money.format(costPerCyWithWaste));
-      setText("wallCy", formatCubicYards(wallCy));
-      setText("wallCost", money.format(wallCost));
-      setText("slabCy", formatCubicYards(slabCy));
-      setText("slabCost", money.format(slabCost));
-      setText("totalCy", formatCubicYards(totalCy));
-      setText("totalCost", money.format(totalCost));
-      setText("heroTotal", money.format(totalCost));
+      return {
+        projectName: getTextValue("projectName") || "Nomads Estimate",
+        customerName: getTextValue("customerName"),
+        estimateDate: getTextValue("estimateDate") || todayIso(),
+        wallLength,
+        wallHeight,
+        wallThickness,
+        slabSqft,
+        slabDepth,
+        portlandTons,
+        sandTons,
+        portlandPrice,
+        sandPrice,
+        wastePercent,
+        baseCostPerCubicYard,
+        costPerCubicYardWithWaste,
+        wallCubicYards,
+        wallCost,
+        slabCubicYards,
+        slabCost,
+        totalCubicYards,
+        totalCost
+      };
     }
 
-    function resetDefaults() {
-      ids.forEach((id) => {
-        document.getElementById(id).value = defaults[id];
-        formatInputValue(id);
+    function calculate() {
+      const result = calculateRaw();
+
+      setText("baseCost", money.format(result.baseCostPerCubicYard));
+      setText("wasteCost", money.format(result.costPerCubicYardWithWaste));
+      setText("wallCy", formatCubicYards(result.wallCubicYards));
+      setText("wallCost", money.format(result.wallCost));
+      setText("slabCy", formatCubicYards(result.slabCubicYards));
+      setText("slabCost", money.format(result.slabCost));
+      setText("totalCy", formatCubicYards(result.totalCubicYards));
+      setText("totalCost", money.format(result.totalCost));
+      setText("heroTotal", money.format(result.totalCost));
+
+      document.title = `${result.projectName} - Nomads Concrete 3D Printer Estimator`;
+      saveDraft();
+      return result;
+    }
+
+    function getFormState() {
+      const state = {};
+      allInputIds.forEach((id) => {
+        state[id] = document.getElementById(id).value;
       });
+      return state;
+    }
+
+    function applyFormState(state) {
+      if (!state) return;
+
+      allInputIds.forEach((id) => {
+        if (Object.prototype.hasOwnProperty.call(state, id)) {
+          document.getElementById(id).value = state[id];
+        }
+      });
+
+      numericIds.forEach(formatInputValue);
       calculate();
     }
 
-    ids.forEach((id) => {
-      const input = document.getElementById(id);
+    function saveDraft() {
+      try {
+        localStorage.setItem(DRAFT_KEY, JSON.stringify(getFormState()));
+      } catch (error) {
+        console.warn("Draft could not be saved.", error);
+      }
+    }
 
-      input.addEventListener("input", calculate);
-      input.addEventListener("blur", () => {
+    function loadDraft() {
+      try {
+        const draft = JSON.parse(localStorage.getItem(DRAFT_KEY));
+        applyFormState(draft);
+      } catch (error) {
+        console.warn("Draft could not be loaded.", error);
+      }
+    }
+
+    function getSavedEstimates() {
+      try {
+        return JSON.parse(localStorage.getItem(STORAGE_KEY)) || [];
+      } catch {
+        return [];
+      }
+    }
+
+    function setSavedEstimates(estimates) {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(estimates));
+    }
+
+    function saveEstimate() {
+      const result = calculateRaw();
+      const saved = getSavedEstimates();
+      const estimate = {
+        id: crypto.randomUUID ? crypto.randomUUID() : String(Date.now()),
+        savedAt: new Date().toISOString(),
+        state: getFormState(),
+        result
+      };
+
+      saved.unshift(estimate);
+      setSavedEstimates(saved.slice(0, 25));
+      renderSavedEstimates();
+      alert("Estimate saved on this device.");
+    }
+
+    function loadEstimate(id) {
+      const estimate = getSavedEstimates().find((item) => item.id === id);
+      if (!estimate) return;
+      applyFormState(estimate.state);
+      window.scrollTo({ top: 0, behavior: "smooth" });
+    }
+
+    function deleteEstimate(id) {
+      const updated = getSavedEstimates().filter((item) => item.id !== id);
+      setSavedEstimates(updated);
+      renderSavedEstimates();
+    }
+
+    function renderSavedEstimates() {
+      const container = document.getElementById("savedEstimates");
+      const empty = document.getElementById("savedEmptyState");
+      const estimates = getSavedEstimates();
+
+      container.innerHTML = "";
+      empty.style.display = estimates.length ? "none" : "block";
+
+      estimates.forEach((estimate) => {
+        const item = document.createElement("div");
+        item.className = "saved-estimate";
+
+        const title = document.createElement("div");
+        title.innerHTML = `
+          <strong>${estimate.result.projectName}</strong>
+          <small>${estimate.result.customerName ? estimate.result.customerName + " · " : ""}${estimate.result.estimateDate} · ${money.format(estimate.result.totalCost)}</small>
+        `;
+
+        const actions = document.createElement("div");
+        actions.className = "saved-actions";
+
+        const loadButton = document.createElement("button");
+        loadButton.type = "button";
+        loadButton.textContent = "Load";
+        loadButton.addEventListener("click", () => loadEstimate(estimate.id));
+
+        const deleteButton = document.createElement("button");
+        deleteButton.type = "button";
+        deleteButton.className = "secondary";
+        deleteButton.textContent = "Delete";
+        deleteButton.addEventListener("click", () => deleteEstimate(estimate.id));
+
+        actions.append(loadButton, deleteButton);
+        item.append(title, actions);
+        container.appendChild(item);
+      });
+    }
+
+    function downloadFile(filename, content, type) {
+      const blob = new Blob([content], { type });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = filename;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+    }
+
+    function exportCsv() {
+      const result = calculateRaw();
+      const rows = [
+        ["Project Name", result.projectName],
+        ["Customer / Location", result.customerName],
+        ["Estimate Date", result.estimateDate],
+        ["Wall Length LF", result.wallLength],
+        ["Wall Height Inches", result.wallHeight],
+        ["Wall Thickness Inches", result.wallThickness],
+        ["Slab Square Feet", result.slabSqft],
+        ["Slab Depth Inches", result.slabDepth],
+        ["Portland Tons per Cubic Yard", result.portlandTons],
+        ["Sand Tons per Cubic Yard", result.sandTons],
+        ["Portland Price per Ton", result.portlandPrice],
+        ["Sand Price per Ton", result.sandPrice],
+        ["Waste Percent", result.wastePercent],
+        ["Base Cost per Cubic Yard", result.baseCostPerCubicYard],
+        ["Cost per Cubic Yard with Waste", result.costPerCubicYardWithWaste],
+        ["Wall Cubic Yards", result.wallCubicYards],
+        ["Wall Cost", result.wallCost],
+        ["Slab Cubic Yards", result.slabCubicYards],
+        ["Slab Cost", result.slabCost],
+        ["Total Cubic Yards", result.totalCubicYards],
+        ["Total Estimated Cost", result.totalCost]
+      ];
+
+      const csv = rows
+        .map((row) => row.map((cell) => `"${String(cell).replace(/"/g, '""')}"`).join(","))
+        .join("\n");
+
+      downloadFile(`${safeFilename(result.projectName)}.csv`, csv, "text/csv;charset=utf-8");
+    }
+
+    function exportJson() {
+      const result = calculateRaw();
+      const payload = {
+        exportedAt: new Date().toISOString(),
+        calculator: "Nomads Concrete 3D Printer Estimator",
+        result,
+        state: getFormState()
+      };
+
+      downloadFile(
+        `${safeFilename(result.projectName)}.json`,
+        JSON.stringify(payload, null, 2),
+        "application/json;charset=utf-8"
+      );
+    }
+
+    function resetDefaults() {
+      document.getElementById("projectName").value = "Nomads Estimate";
+      document.getElementById("customerName").value = "";
+      document.getElementById("estimateDate").value = todayIso();
+
+      numericIds.forEach((id) => {
+        document.getElementById(id).value = defaults[id];
         formatInputValue(id);
-        calculate();
       });
 
-      formatInputValue(id);
+      calculate();
+    }
+
+    allInputIds.forEach((id) => {
+      const input = document.getElementById(id);
+      input.addEventListener("input", calculate);
+
+      if (numericIds.includes(id)) {
+        input.addEventListener("blur", () => {
+          formatInputValue(id);
+          calculate();
+        });
+      }
     });
 
+    document.getElementById("saveEstimateButton").addEventListener("click", saveEstimate);
+    document.getElementById("printButton").addEventListener("click", () => window.print());
+    document.getElementById("exportCsvButton").addEventListener("click", exportCsv);
+    document.getElementById("exportJsonButton").addEventListener("click", exportJson);
     document.getElementById("resetButton").addEventListener("click", resetDefaults);
 
+    if (!document.getElementById("estimateDate").value) {
+      document.getElementById("estimateDate").value = todayIso();
+    }
+
+    numericIds.forEach(formatInputValue);
+    loadDraft();
     calculate();
+    renderSavedEstimates();
   </script>
 </body>
 </html>
