@@ -202,6 +202,40 @@
       box-shadow: 0 0 0 4px rgba(0, 65, 107, 0.16);
     }
 
+    .currency-input,
+    .percent-input {
+      position: relative;
+      display: flex;
+      align-items: center;
+    }
+
+    .currency-input input {
+      padding-left: 32px;
+    }
+
+    .percent-input input {
+      padding-right: 36px;
+    }
+
+    .currency-symbol,
+    .percent-symbol {
+      position: absolute;
+      top: 50%;
+      transform: translateY(-50%);
+      color: var(--navy);
+      font-weight: 900;
+      z-index: 1;
+      pointer-events: none;
+    }
+
+    .currency-symbol {
+      left: 13px;
+    }
+
+    .percent-symbol {
+      right: 13px;
+    }
+
     .hint {
       display: block;
       margin-top: 6px;
@@ -352,25 +386,25 @@
           <div class="input-grid">
             <div class="field">
               <label for="wallLength">Wall Length</label>
-              <input id="wallLength" type="number" min="0" step="0.01" value="750" />
+              <input id="wallLength" type="text" inputmode="decimal" value="750" />
               <span class="hint">Linear feet</span>
             </div>
 
             <div class="field">
               <label for="wallHeight">Wall Height</label>
-              <input id="wallHeight" type="number" min="0" step="0.01" value="120" />
+              <input id="wallHeight" type="text" inputmode="decimal" value="120" />
               <span class="hint">Inches / printed layers</span>
             </div>
 
             <div class="field">
               <label for="wallThickness">Wall Thickness</label>
-              <input id="wallThickness" type="number" min="0" step="0.01" value="3.75" />
+              <input id="wallThickness" type="text" inputmode="decimal" value="3.75" />
               <span class="hint">Inches; default is 1.5 × 2.5</span>
             </div>
           </div>
 
           <div class="formula">
-            <strong>Wall CY</strong> = wall LF × 12 × thickness in × height in ÷ 46,656
+            <strong>Wall Cubic Yards</strong> = wall LF × 12 × thickness in × height in ÷ 46,656
           </div>
         </div>
 
@@ -383,19 +417,19 @@
           <div class="input-grid">
             <div class="field">
               <label for="slabSqft">Slab Area</label>
-              <input id="slabSqft" type="number" min="0" step="0.01" value="2400" />
+              <input id="slabSqft" type="text" inputmode="decimal" value="2,400" />
               <span class="hint">Square feet</span>
             </div>
 
             <div class="field">
               <label for="slabDepth">Slab Depth</label>
-              <input id="slabDepth" type="number" min="0" step="0.01" value="4" />
+              <input id="slabDepth" type="text" inputmode="decimal" value="4" />
               <span class="hint">Inches</span>
             </div>
           </div>
 
           <div class="formula">
-            <strong>Slab CY</strong> = slab square feet × depth in ÷ 324
+            <strong>Slab Cubic Yards</strong> = slab square feet × depth in ÷ 324
           </div>
         </div>
 
@@ -407,32 +441,41 @@
 
           <div class="input-grid">
             <div class="field">
-              <label for="portlandTons">Portland Per CY</label>
-              <input id="portlandTons" type="number" min="0" step="0.01" value="1.5" />
+              <label for="portlandTons">Portland Per Cubic Yard</label>
+              <input id="portlandTons" type="text" inputmode="decimal" value="1.5" />
               <span class="hint">Tons per cubic yard</span>
             </div>
 
             <div class="field">
-              <label for="sandTons">Sand Per CY</label>
-              <input id="sandTons" type="number" min="0" step="0.01" value="0.65" />
+              <label for="sandTons">Sand Per Cubic Yard</label>
+              <input id="sandTons" type="text" inputmode="decimal" value="0.65" />
               <span class="hint">Tons per cubic yard</span>
             </div>
 
             <div class="field">
               <label for="portlandPrice">Portland Price</label>
-              <input id="portlandPrice" type="number" min="0" step="0.01" value="150" />
+              <div class="currency-input">
+                <span class="currency-symbol">$</span>
+                <input id="portlandPrice" type="text" inputmode="decimal" value="150" />
+              </div>
               <span class="hint">Dollars per ton</span>
             </div>
 
             <div class="field">
               <label for="sandPrice">Sand Price</label>
-              <input id="sandPrice" type="number" min="0" step="0.01" value="30" />
+              <div class="currency-input">
+                <span class="currency-symbol">$</span>
+                <input id="sandPrice" type="text" inputmode="decimal" value="30" />
+              </div>
               <span class="hint">Dollars per ton</span>
             </div>
 
             <div class="field">
               <label for="wastePercent">Waste / Overage</label>
-              <input id="wastePercent" type="number" min="0" step="0.01" value="10" />
+              <div class="percent-input">
+                <input id="wastePercent" type="text" inputmode="decimal" value="10" />
+                <span class="percent-symbol">%</span>
+              </div>
               <span class="hint">Percent</span>
             </div>
           </div>
@@ -447,18 +490,18 @@
 
         <div class="results">
           <div class="result-row">
-            <span class="result-label">Base Cost per CY</span>
+            <span class="result-label">Base Cost per Cubic Yard</span>
             <span class="result-value" id="baseCost">$0.00</span>
           </div>
 
           <div class="result-row">
-            <span class="result-label">Cost per CY with Waste</span>
+            <span class="result-label">Cost per Cubic Yard with Waste</span>
             <span class="result-value" id="wasteCost">$0.00</span>
           </div>
 
           <div class="result-row">
             <span class="result-label">Wall Cubic Yards</span>
-            <span class="result-value" id="wallCy">0.00 CY</span>
+            <span class="result-value" id="wallCy">0.00 Cubic Yards</span>
           </div>
 
           <div class="result-row">
@@ -468,7 +511,7 @@
 
           <div class="result-row">
             <span class="result-label">Slab Cubic Yards</span>
-            <span class="result-value" id="slabCy">0.00 CY</span>
+            <span class="result-value" id="slabCy">0.00 Cubic Yards</span>
           </div>
 
           <div class="result-row">
@@ -478,7 +521,7 @@
 
           <div class="result-row">
             <span class="result-label">Total Cubic Yards</span>
-            <span class="result-value" id="totalCy">0.00 CY</span>
+            <span class="result-value" id="totalCy">0.00 Cubic Yards</span>
           </div>
 
           <div class="result-row total">
@@ -520,13 +563,39 @@
       currency: "USD"
     });
 
+    const numberFormatter = new Intl.NumberFormat("en-US", {
+      minimumFractionDigits: 0,
+      maximumFractionDigits: 2
+    });
+
+    function parseNumber(value) {
+      const cleanValue = String(value).replace(/[$,%\s]/g, "").replace(/,/g, "");
+      const number = Number(cleanValue);
+      return Number.isFinite(number) && number >= 0 ? number : 0;
+    }
+
     function getValue(id) {
-      const value = Number(document.getElementById(id).value);
-      return Number.isFinite(value) && value >= 0 ? value : 0;
+      return parseNumber(document.getElementById(id).value);
+    }
+
+    function formatInputValue(id) {
+      const input = document.getElementById(id);
+      const number = parseNumber(input.value);
+
+      if (!number) {
+        input.value = "0";
+        return;
+      }
+
+      input.value = numberFormatter.format(number);
     }
 
     function setText(id, text) {
       document.getElementById(id).textContent = text;
+    }
+
+    function formatCubicYards(value) {
+      return `${numberFormatter.format(value)} Cubic Yards`;
     }
 
     function calculate() {
@@ -561,11 +630,11 @@
 
       setText("baseCost", money.format(baseCostPerCy));
       setText("wasteCost", money.format(costPerCyWithWaste));
-      setText("wallCy", `${wallCy.toFixed(2)} CY`);
+      setText("wallCy", formatCubicYards(wallCy));
       setText("wallCost", money.format(wallCost));
-      setText("slabCy", `${slabCy.toFixed(2)} CY`);
+      setText("slabCy", formatCubicYards(slabCy));
       setText("slabCost", money.format(slabCost));
-      setText("totalCy", `${totalCy.toFixed(2)} CY`);
+      setText("totalCy", formatCubicYards(totalCy));
       setText("totalCost", money.format(totalCost));
       setText("heroTotal", money.format(totalCost));
     }
@@ -573,12 +642,21 @@
     function resetDefaults() {
       ids.forEach((id) => {
         document.getElementById(id).value = defaults[id];
+        formatInputValue(id);
       });
       calculate();
     }
 
     ids.forEach((id) => {
-      document.getElementById(id).addEventListener("input", calculate);
+      const input = document.getElementById(id);
+
+      input.addEventListener("input", calculate);
+      input.addEventListener("blur", () => {
+        formatInputValue(id);
+        calculate();
+      });
+
+      formatInputValue(id);
     });
 
     document.getElementById("resetButton").addEventListener("click", resetDefaults);
